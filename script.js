@@ -1,7 +1,7 @@
 // Configuration
 const CONFIG = {
-  batchSize: 20, // Number of images to load at once
-  throttleDelay: 200 // Delay between image batches
+  batchSize: 20,
+  throttleDelay: 200
 };
 
 // DOM Elements
@@ -30,7 +30,6 @@ const elements = {
   closeMobileFilter: document.getElementById('closeMobileFilter'),
   mobileApplyFilters: document.getElementById('mobileApplyFilters'),
   mobileResetFilters: document.getElementById('mobileResetFilters'),
-  // New elements for links functionality
   linksDot: document.getElementById('linksDot'),
   linksModal: document.getElementById('linksModal'),
   closeLinksModal: document.getElementById('closeLinksModal')
@@ -39,7 +38,6 @@ const elements = {
 // State
 let allPrompts = [];
 let filteredPrompts = [];
-let loadedImages = 0;
 let isLoadingImages = false;
 let selectedCategories = new Set(['all']);
 let tempSelectedCategories = new Set(['all']);
@@ -48,28 +46,36 @@ let tempSelectedCategories = new Set(['all']);
 function init() {
   setupEventListeners();
   loadPromptsFromJSON();
-
-  // Show search and filter panels on initial load since we're on the Prompts page
+  
   elements.searchPanel.style.display = 'block';
   elements.filterPanel.style.display = 'block';
+
+  // Handle page visibility to reload if needed
+  document.addEventListener('visibilitychange', function() {
+    if (!document.hidden && (allPrompts.length === 0 || filteredPrompts.length === 0)) {
+      loadPromptsFromJSON();
+    }
+  });
+
+  // Handle page load from cache (back/forward navigation)
+  window.addEventListener('pageshow', function(event) {
+    if (event.persisted) {
+      loadPromptsFromJSON();
+    }
+  });
 }
 
 // Event Listeners
 function setupEventListeners() {
-  // Prompts button
   elements.promptsBtn.addEventListener('click', () => {
     switchToPage('prompts');
     closeSidebar();
   });
 
-  // Menu button to open sidebar
   elements.menuBtn.addEventListener('click', openSidebar);
-
-  // Close sidebar
   elements.closeSidebar.addEventListener('click', closeSidebar);
   elements.sidebarOverlay.addEventListener('click', closeSidebar);
 
-  // Sidebar navigation links
   document.querySelectorAll('.sidebar-link[data-page]').forEach(link => {
     link.addEventListener('click', (e) => {
       e.preventDefault();
@@ -79,7 +85,6 @@ function setupEventListeners() {
     });
   });
 
-  // Footer links
   elements.footerAbout.addEventListener('click', (e) => {
     e.preventDefault();
     switchToPage('about');
@@ -90,7 +95,6 @@ function setupEventListeners() {
     switchToPage('contact');
   });
 
-  // Search functionality
   elements.clearSearch.addEventListener('click', () => {
     elements.searchInput.value = '';
     filterPrompts();
@@ -98,21 +102,16 @@ function setupEventListeners() {
 
   elements.searchInput.addEventListener('input', throttle(filterPrompts, 300));
 
-  // Filter toggle - show appropriate filter UI based on screen size
   elements.filterToggle.addEventListener('click', (e) => {
     e.stopPropagation();
-
     if (window.innerWidth <= 768) {
-      // Show mobile overlay on small screens
       showMobileFilterOverlay();
     } else {
-      // Show desktop dropdown on larger screens
       elements.categoryDropdown.classList.toggle('show');
       elements.filterToggle.classList.toggle('active');
     }
   });
 
-  // Close dropdown when clicking outside
   document.addEventListener('click', (e) => {
     if (!elements.filterPanel.contains(e.target) && 
         elements.categoryDropdown.classList.contains('show')) {
@@ -121,15 +120,13 @@ function setupEventListeners() {
     }
   });
 
-  // Category buttons - desktop
   document.querySelectorAll('.category-container .category-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
-      e.stopPropagation(); // Prevent event from bubbling to document
+      e.stopPropagation();
       handleCategorySelection(btn);
     });
   });
 
-  // Category buttons - mobile overlay
   document.querySelectorAll('.mobile-category-container .category-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -137,7 +134,6 @@ function setupEventListeners() {
     });
   });
 
-  // Apply and reset filters - desktop
   elements.applyFilters.addEventListener('click', () => {
     selectedCategories = new Set(tempSelectedCategories);
     filterPrompts();
@@ -154,7 +150,6 @@ function setupEventListeners() {
     elements.filterToggle.classList.remove('active');
   });
 
-  // Apply and reset filters - mobile
   elements.mobileApplyFilters.addEventListener('click', () => {
     selectedCategories = new Set(tempSelectedCategories);
     filterPrompts();
@@ -169,23 +164,13 @@ function setupEventListeners() {
     hideMobileFilterOverlay();
   });
 
-  // Close mobile filter
-  elements.closeMobileFilter.addEventListener('click', () => {
-    hideMobileFilterOverlay();
-  });
-
-  // Contact form submission
+  elements.closeMobileFilter.addEventListener('click', hideMobileFilterOverlay);
   elements.contactForm.addEventListener('submit', handleContactSubmit);
-
-  // Lazy load images when scrolling
   window.addEventListener('scroll', throttle(lazyLoadImages, 200));
   window.addEventListener('resize', throttle(lazyLoadImages, 200));
-
-  // New event listeners for links functionality
   elements.linksDot.addEventListener('click', showLinksModal);
   elements.closeLinksModal.addEventListener('click', hideLinksModal);
 
-  // Close modal when clicking outside
   elements.linksModal.addEventListener('click', (e) => {
     if (e.target === elements.linksModal) {
       hideLinksModal();
@@ -193,7 +178,7 @@ function setupEventListeners() {
   });
 }
 
-// Sidebar functions
+// UI Functions
 function openSidebar() {
   elements.sidebar.classList.add('open');
   elements.sidebarOverlay.classList.add('show');
@@ -206,48 +191,39 @@ function closeSidebar() {
   document.body.classList.remove('sidebar-open');
 }
 
-// Show links modal
 function showLinksModal() {
   elements.linksModal.classList.add('show');
-  document.body.style.overflow = 'hidden'; // Prevent background scrolling
+  document.body.style.overflow = 'hidden';
 }
 
-// Hide links modal
 function hideLinksModal() {
   elements.linksModal.classList.remove('show');
-  document.body.style.overflow = ''; // Re-enable scrolling
+  document.body.style.overflow = '';
 }
 
-// Show mobile filter overlay
 function showMobileFilterOverlay() {
-  // Sync temp selection with current selection
   tempSelectedCategories = new Set(selectedCategories);
   updateMobileCategoryButtons(tempSelectedCategories);
   elements.mobileFilterOverlay.classList.add('show');
-  document.body.style.overflow = 'hidden'; // Prevent background scrolling
+  document.body.style.overflow = 'hidden';
 }
 
-// Hide mobile filter overlay
 function hideMobileFilterOverlay() {
   elements.mobileFilterOverlay.classList.remove('show');
-  document.body.style.overflow = ''; // Re-enable scrolling
+  document.body.style.overflow = '';
 }
 
-// Handle category selection for desktop
 function handleCategorySelection(btn) {
   const category = btn.dataset.category;
-
   if (category === 'all') {
     tempSelectedCategories.clear();
     tempSelectedCategories.add('all');
     updateCategoryButtons(tempSelectedCategories);
   } else {
     tempSelectedCategories.delete('all');
-
     if (tempSelectedCategories.has(category)) {
       tempSelectedCategories.delete(category);
       btn.classList.remove('active');
-
       if (tempSelectedCategories.size === 0) {
         tempSelectedCategories.add('all');
         document.querySelector('.category-container [data-category="all"]').classList.add('active');
@@ -260,21 +236,17 @@ function handleCategorySelection(btn) {
   }
 }
 
-// Handle category selection for mobile
 function handleMobileCategorySelection(btn) {
   const category = btn.dataset.category;
-
   if (category === 'all') {
     tempSelectedCategories.clear();
     tempSelectedCategories.add('all');
     updateMobileCategoryButtons(tempSelectedCategories);
   } else {
     tempSelectedCategories.delete('all');
-
     if (tempSelectedCategories.has(category)) {
       tempSelectedCategories.delete(category);
       btn.classList.remove('active');
-
       if (tempSelectedCategories.size === 0) {
         tempSelectedCategories.add('all');
         document.querySelector('.mobile-category-container [data-category="all"]').classList.add('active');
@@ -287,51 +259,34 @@ function handleMobileCategorySelection(btn) {
   }
 }
 
-// Update category buttons based on selection (desktop)
 function updateCategoryButtons(categories) {
   document.querySelectorAll('.category-container .category-btn').forEach(btn => {
     const category = btn.dataset.category;
-    if (categories.has(category)) {
-      btn.classList.add('active');
-    } else {
-      btn.classList.remove('active');
-    }
+    btn.classList.toggle('active', categories.has(category));
   });
 }
 
-// Update category buttons based on selection (mobile)
 function updateMobileCategoryButtons(categories) {
   document.querySelectorAll('.mobile-category-container .category-btn').forEach(btn => {
     const category = btn.dataset.category;
-    if (categories.has(category)) {
-      btn.classList.add('active');
-    } else {
-      btn.classList.remove('active');
-    }
+    btn.classList.toggle('active', categories.has(category));
   });
 }
 
-// Switch between pages
 function switchToPage(page) {
-  // Reset all pages and buttons
   elements.promptsPage.classList.remove('active');
   elements.aboutPage.classList.remove('active');
   elements.contactPage.classList.remove('active');
   elements.promptsBtn.classList.remove('active');
 
-  // Hide search and filter panels by default
   elements.searchPanel.style.display = 'none';
   elements.filterPanel.style.display = 'none';
   elements.categoryDropdown.classList.remove('show');
   elements.filterToggle.classList.remove('active');
 
-  // Hide mobile filter overlay if visible
   hideMobileFilterOverlay();
-
-  // Hide links modal if visible
   hideLinksModal();
 
-  // Activate selected page and button
   switch(page) {
     case 'prompts':
       elements.promptsPage.classList.add('active');
@@ -348,82 +303,62 @@ function switchToPage(page) {
   }
 }
 
-// Throttle function for performance
 function throttle(func, limit) {
-  let lastFunc;
-  let lastRan;
+  let inThrottle;
   return function() {
-    const context = this;
     const args = arguments;
-    if (!lastRan) {
+    const context = this;
+    if (!inThrottle) {
       func.apply(context, args);
-      lastRan = Date.now();
-    } else {
-      clearTimeout(lastFunc);
-      lastFunc = setTimeout(function() {
-        if ((Date.now() - lastRan) >= limit) {
-          func.apply(context, args);
-          lastRan = Date.now();
-        }
-      }, limit - (Date.now() - lastRan));
+      inThrottle = true;
+      setTimeout(() => inThrottle = false, limit);
     }
   };
 }
 
-// Handle contact form submission
 function handleContactSubmit(e) {
   e.preventDefault();
-
-  // In a real implementation, you would send this data to a server
-  // For now, we'll just show a confirmation and reset the form
   alert('Thank you for your message! We will get back to you soon.');
   elements.contactForm.reset();
-
-  // Here you would typically send the form data to your backend
-  // using fetch() or XMLHttpRequest
 }
 
-// Search Functions
+// Data Functions
 function filterPrompts() {
   const searchTerm = elements.searchInput.value.toLowerCase();
-
   filteredPrompts = allPrompts.filter(prompt => {
-    // Check search term
     const matchesSearch = !searchTerm || 
       prompt.title.toLowerCase().includes(searchTerm) ||
       prompt.description.toLowerCase().includes(searchTerm) ||
       prompt.category.toLowerCase().includes(searchTerm);
-
-    // Check category filter
     const matchesCategory = selectedCategories.has('all') || 
       selectedCategories.has(prompt.category.toLowerCase());
-
     return matchesSearch && matchesCategory;
   });
-
   renderPromptCards();
 }
 
-// Data Loading
 async function loadPromptsFromJSON() {
   try {
-    // Show loading state
-    elements.promptsGrid.innerHTML = Array(12).fill(`
-      <div class="prompt-card loading">
-        <div class="card-image"></div>
-        <div class="card-content">
-          <div class="card-title"></div>
-        </div>
-      </div>
-    `).join('');
-
+    showLoadingState();
     const response = await fetch('prompt.json');
+    if (!response.ok) throw new Error('Network response was not ok');
     const data = await response.json();
     processJSONData(data);
   } catch (error) {
     console.error('Error loading prompts:', error);
     showError();
   }
+}
+
+function showLoadingState() {
+  elements.promptsGrid.innerHTML = Array(12).fill(`
+    <div class="prompt-card loading">
+      <div class="card-image"></div>
+      <div class="card-content">
+        <div class="card-title"></div>
+      </div>
+    </div>
+  `).join('');
 }
 
 function processJSONData(prompts) {
@@ -434,8 +369,8 @@ function processJSONData(prompts) {
     image: prompt.image || '',
     description: prompt.description || '',
     category: prompt.category || ''
-  })).reverse(); // Show newest first
-
+  })).reverse();
+  
   filteredPrompts = [...allPrompts];
   renderPromptCards();
 }
@@ -449,7 +384,7 @@ function showError() {
   `;
 }
 
-// Rendering
+// Rendering Functions - COMPLETELY REWRITTEN
 function renderPromptCards() {
   if (filteredPrompts.length === 0) {
     elements.promptsGrid.innerHTML = `
@@ -461,23 +396,44 @@ function renderPromptCards() {
     return;
   }
 
-  // Show loading state initially
-  elements.promptsGrid.innerHTML = filteredPrompts.map((prompt, index) => `
-    <div class="prompt-card loading" data-index="${index}" data-title="${prompt.title}">
-      <div class="card-image"></div>
-      <div class="card-content">
-        <div class="card-title"></div>
-        <div class="tags" hidden>${prompt.category}</div>
-      </div>
-    </div>
-  `).join('');
+  // Clear and rebuild the grid completely
+  elements.promptsGrid.innerHTML = '';
+  
+  filteredPrompts.forEach((prompt, index) => {
+    const card = createPromptCard(prompt, index);
+    elements.promptsGrid.appendChild(card);
+  });
 
-  // Start lazy loading images
-  loadedImages = 0;
-  lazyLoadImages();
+  // Start loading visible images
+  setTimeout(() => lazyLoadImages(), 100);
 }
 
-// Improved image loading with lazy loading and batching
+function createPromptCard(prompt, index) {
+  const card = document.createElement('div');
+  card.className = 'prompt-card loading';
+  card.setAttribute('data-index', index);
+  card.setAttribute('data-prompt-id', prompt.id || index);
+  
+  card.innerHTML = `
+    <div class="card-image"></div>
+    <div class="card-content">
+      <div class="card-title"></div>
+      <div class="tags" hidden>${prompt.category}</div>
+    </div>
+  `;
+
+  // Store prompt data directly on the card element
+  card._promptData = prompt;
+
+  card.addEventListener('click', () => {
+    if (prompt.fileName) {
+      window.location.href = `prompt/${prompt.fileName}`;
+    }
+  });
+
+  return card;
+}
+
 function lazyLoadImages() {
   if (isLoadingImages) return;
 
@@ -486,37 +442,41 @@ function lazyLoadImages() {
 
   isLoadingImages = true;
   const viewportHeight = window.innerHeight;
-  const scrollPosition = window.scrollY || window.pageYOffset;
-
   let loadedInThisBatch = 0;
 
-  for (let i = 0; i < cards.length && loadedInThisBatch < CONFIG.batchSize; i++) {
-    const card = cards[i];
+  for (let card of cards) {
+    if (loadedInThisBatch >= CONFIG.batchSize) break;
+
     const rect = card.getBoundingClientRect();
     const isVisible = (rect.top <= viewportHeight * 2) && 
                      (rect.bottom >= -viewportHeight * 0.5);
 
     if (isVisible) {
-      const index = parseInt(card.dataset.index);
-      const prompt = filteredPrompts[index];
-      loadImageForCard(card, prompt);
+      // Use the data stored directly on the card element
+      const prompt = card._promptData;
+      
+      if (!prompt || !prompt.image) {
+        console.warn('Missing prompt data for card:', card);
+        showErrorCard(card, 'Missing data');
+        continue;
+      }
+
+      loadSingleImage(card, prompt);
       loadedInThisBatch++;
     }
   }
 
   setTimeout(() => {
     isLoadingImages = false;
-    // Check if there are more images to load
     if (document.querySelectorAll('.prompt-card.loading').length > 0) {
       lazyLoadImages();
     }
   }, CONFIG.throttleDelay);
 }
 
-function loadImageForCard(card, prompt) {
+function loadSingleImage(card, prompt) {
   const img = new Image();
-  img.src = `images/${prompt.image}`;
-
+  
   img.onload = () => {
     card.classList.remove('loading');
     card.innerHTML = `
@@ -527,37 +487,34 @@ function loadImageForCard(card, prompt) {
       </div>
     `;
 
-    // Add fade-in effect
     const imgElement = card.querySelector('.card-image');
-    setTimeout(() => {
-      imgElement.classList.add('loaded');
-    }, 50);
+    setTimeout(() => imgElement.classList.add('loaded'), 50);
 
-    // Redirect to prompt page on click
+    // Reattach click event
     card.addEventListener('click', () => {
-      window.location.href = `prompt/${prompt.fileName}`;
+      if (prompt.fileName) {
+        window.location.href = `prompt/${prompt.fileName}`;
+      }
     });
-    loadedImages++;
   };
 
   img.onerror = () => {
-    card.classList.remove('loading');
-    card.innerHTML = `
-      <div class="card-image" style="background: #eee; display: grid; place-items: center;">
-        <i class="fas fa-image" style="font-size: 2em; color: #ccc;"></i>
-      </div>
-      <div class="card-content">
-        <h3 class="card-title">${prompt.title}</h3>
-        <div class="tags" hidden>${prompt.category}</div>
-      </div>
-    `;
-
-    // Redirect to prompt page on click
-    card.addEventListener('click', () => {
-      window.location.href = `prompt/${prompt.fileName}`;
-    });
-    loadedImages++;
+    showErrorCard(card, 'Image failed to load');
   };
+
+  img.src = `images/${prompt.image}`;
+}
+
+function showErrorCard(card, message) {
+  card.classList.remove('loading');
+  card.innerHTML = `
+    <div class="card-image" style="background: #eee; display: grid; place-items: center;">
+      <i class="fas fa-exclamation-triangle" style="font-size: 2em; color: #ccc;"></i>
+    </div>
+    <div class="card-content">
+      <h3 class="card-title">${message}</h3>
+    </div>
+  `;
 }
 
 // Start the app
