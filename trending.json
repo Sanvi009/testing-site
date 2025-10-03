@@ -1,0 +1,18 @@
+[
+  {
+      "id": 1,
+      "fileName": "Serene_Cyan_Ink_Wash_Art_with_Subtle_Abstraction.html",
+      "title": "Cyan Serenity Ink Wash",
+      "image": "1.jpeg",
+      "description": "Learn the fundamentals of crafting prompts that generate stunning AI artwork",
+      "category": "arts"
+  },
+  {
+      "id": 2,
+      "fileName": "Hyperrealistic_Poster_of_an_Object_in_a_Blooming_Meadow.html",
+      "title": "any object with beautiful stuff",
+      "image": "2.jpeg",
+      "description": "Learn the fundamentals of crafting prompts that generate stunning AI artwork",
+      "category": "logo"
+  }
+]
